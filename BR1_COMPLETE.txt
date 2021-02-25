@@ -1,0 +1,147 @@
+!
+no ip domain-lookup
+hostname BR1
+ip domain-name worldskills.ru
+username wsruser priv 15 secret network
+enable secret wsr
+service password-encryption
+ipv6 unicast-routing
+aaa new-model
+aaa authentication login default local
+aaa authorization console
+aaa authorization exec default local
+line vty 0 4
+login authentication default
+authorization exec default
+transport input ssh
+line console 0
+login authentication default
+authorization exec default
+!
+interface loopback 0
+ip address 3.3.3.3 255.255.255.255
+ipv6 add 2001:A:B:3::1/64
+no sh
+crypto key generate rsa modulus 1024
+!
+ip ssh ver 2
+!
+int  serial0/2/1
+shutdown
+!
+int g0/0
+no sh
+int g0/0.10
+encaps dot1q 10
+ip address 172.16.3.3 255.255.255.0
+ipv6 add 2001:4::3/64
+no sh
+!
+!
+interface Multilink1
+no sh
+enc ppp
+ip address negotiated
+ppp multilink
+ppp multilink group 1
+!
+int s0/1/0
+enc ppp
+no sh
+ppp multilink
+ppp multilink group 1
+int s0/1/1
+no sh
+enc ppp
+ppp multilink
+ppp multilink group 1
+!
+int s0/2/0
+no sh
+enc hdlc
+ip address 22.84.4.2 255.255.255.252
+!
+router ospf 1
+network 172.16.3.0 0.0.0.255 area 0
+network 192.168.2.0  0.0.0.255 area 1
+network 172.16.1.0 0.0.0.255 area 0
+passive-interface default
+no passive-interface g0/0.10
+!
+router bgp 65010
+network 3.3.3.3 mask 255.255.255.255
+network 100.45.5.0 mask 255.255.255.252
+network 22.84.4.0 mask 255.255.255.252
+neighbor 100.45.5.1 remote-as 65001
+neighbor 22.84.4.1 remote-as 65002
+ipv6 router eigrp 6000
+eigrp router-id 3.3.3.3
+no sh
+int lo0
+ipv6 eigrp 6000
+int g0/0.10
+ipv6 eigrp 6000
+ntp server 172.16.20.20
+clock timezone MSK 3
+bba-group pppoe global
+virtual-template 1
+exit
+!
+interface g0/1
+ipv6 eigrp 6000
+ip address 192.168.2.1 255.255.255.0
+ipv6 address 2001:A:B:ACAD::1/64
+no sh
+exit
+!
+ip local pool PC2 192.168.2.10
+interface virtual-template 1
+ipv6 eigrp 6000
+peer default ip address pool PC2
+encapsulation ppp
+ppp authentication ms-chap ms-chap-v2
+mtu 1492
+ipv6 unnumbered Loopback20
+ipv6 enable
+ipv6 mtu 1492
+ipv6 nd managed-config-flag
+username cisco password cisco
+interface g0/1
+no sh
+pppoe enable
+pppoe enable group global
+exit
+!
+username user1 privilege 5 password cisco
+privilege exec level 5 debug
+privilege exec level 5 undebug
+privilege exec level 5 reload
+username user2 view sh_view password cisco
+parser view sh_view
+secret cisco 
+command exec include show cdp neighbor
+command exec include all show ip
+command exec include ping
+command exec include traceroute
+!
+int tun 1
+no sh
+ip address 172.16.1.2 255.255.255.0
+tunnel source 1.1.1.1
+!
+tunnel destination 3.3.3.3
+!
+crypto isakmp policy 10
+hash sha
+encryption des
+authentication pre-share
+group 2
+crypto isakmp key cisco address 1.1.1.1
+crypto ipsec transform-set tunnel esp-des esp-sha-hmac
+mode tunnel
+crypto ipsec profile tunnelprofile
+ set transform-set tunnel
+int tun 1
+tunnel protection ipsec profile tunnelprofile
+!
+end

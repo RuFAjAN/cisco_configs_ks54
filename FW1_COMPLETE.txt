@@ -1,0 +1,87 @@
+hostname FW1
+domain-name worldskills.ru
+username wsruser password network privilege 15
+enable password wsr
+password encryption aes
+aaa authentication ssh console LOCAL
+aaa authentication serial console LOCAL
+aaa authentication enable console LOCAL
+crypto key generate rsa modulus 1024
+yes
+ssh ver 2
+!
+int vlan 20
+security-level 100
+nameif tohq1
+ip address 30.78.87.2 255.255.255.248
+ipv6 add 2001:3::2/64
+int e0/2
+no sh
+switchport mode trunk
+switchport trunk allowed vlan 10,20,100,200,300,500,901
+!
+int vlan 100
+security-level 100
+no sh
+nameif toisp1
+ip address 100.45.10.2 255.255.255.252
+no sh
+
+int e0/0
+no sh
+switchport access vlan 100
+!
+interface vlan 901
+nameif toisp2
+ip address 22.84.4.6 255.255.255.252
+security-level 100
+no sh
+!
+int vlan 10
+security-level 100
+nameif l2vpn
+ip address 172.16.3.2 255.255.255.0
+ipv6 add 2001:4::2/64
+no sh
+!
+interface e0/1
+no sh
+switchport mode trunk
+switchport trunk allowed vlan 10,20,100,200,300,500,901
+!
+int e0/4
+no sh
+switchport mode trunk
+switchport trunk allowed vlan 10,20,100,200,300,500,901
+switch access vlan 10
+exit
+!
+icmp permit any inside
+icmp permit any outside
+icmp permit any l2vpn
+icmp permit any tohq1
+icmp permit any toisp1
+icmp permit any toisp2
+!
+router ospf 1
+network 172.16.3.0 255.255.255.0 area 0
+router bgp 65000
+address-family ipv4 unicast
+network 30.78.87.0 mask 255.255.255.248
+network 22.84.4.4 mask 255.255.255.252
+network 100.45.10.0 mask 255.255.255.252
+neighbor 30.78.87.1 remote-as 65000
+neighbor 30.78.87.1 activate
+neighbor 100.45.10.1 remote-as 65001
+neighbor 22.84.4.5 remote-as 65002
+ntp server 172.16.20.20
+clock timezone MSK 3
+logging enable
+logging trap informational
+logging host isp3 172.16.20.20
+snmp-server location MSK, Russia
+snmp-server contact admin@wsr.ru
+snmp-server group WSR v3 priv
+snmp-server community DEMOWSR
+snmp-server user snmpuser WSR v3 auth sha snmppass priv aes 128 snmppass
+snmp-server host HQ1 172.16.20.20 community DEMOWSR version 3 snmpuser

@@ -1,0 +1,68 @@
+!
+no ip domain-lookup
+hostname SW1
+ip domain-name worldskills.ru
+username wsruser privilege 15 secret network
+enable secret wsr
+service password-encryption
+aaa new-model
+aaa authentication login default local
+aaa authorization console
+aaa authorization exec default local
+line vty 0 15
+login authentication default
+authorization exec default
+transport input ssh
+lin con 0
+login authentication default
+authorization exec default
+crypto key generate rsa modulus 1024
+!
+ip ssh ver 2
+ip def 10.100.100.1
+!
+vtp mode server
+vtp domain worldskills.ru
+vtp password cisco
+!
+vlan 100
+name MGT
+vlan 200
+name DATA
+vlan 300
+name OFFICE
+vlan 500
+name NATIVE
+vlan 600
+name SHUTDOWN
+!
+int range fa 0/5-6
+channel-group 1 mode active
+switchport mode dynamic desirable
+!
+int range fa 0/3-4
+channel-group 2 mode desirable
+switchport mode dynamic desirable
+!
+int range Po1, po2
+switchport mode dynamic desirable
+exit
+!
+int vlan 100
+ip add 10.100.100.10 255.255.255.0
+no sh
+exit
+!
+spanning-tree mode pvst
+spanning-tree vlan 100,200,300 root primary
+!
+int fa 0/1
+switchport trunk encapsulation dot1Q
+switchport mode trunk
+interface range fa 0/2,f0/7-23
+switchport access vlan 600
+shutdown
+exit
+!
+ntp server 172.16.20.20
+clock timezone MSK 3

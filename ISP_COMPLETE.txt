@@ -1,0 +1,209 @@
+!
+hostname ISP
+!
+boot-start-marker
+boot-end-marker
+!
+!
+aaa new-model
+!
+!
+aaa authentication login default local
+aaa authentication ppp default local
+aaa authorization network default local
+!
+aaa session-id common
+clock timezone EET 2 0
+mmi polling-interval 60
+no mmi auto-configure
+no mmi pvc
+mmi snmp-timeout 180
+!
+ip local pool PPP 100.45.5.2
+ip forward-protocol nd
+!
+ip vrf ISP1
+ rd 1:1
+ route-target export 1:1
+ route-target export 2:2
+ route-target import 1:1
+ route-target import 2:2
+!
+ip vrf ISP2
+ rd 2:2
+ route-target export 1:1
+ route-target export 2:2
+ route-target import 1:1
+ route-target import 2:2
+!
+!
+!
+!
+no ip domain lookup
+ip domain name worldskills.ru
+ip cef
+no ipv6 cef
+!
+multilink bundle-name authenticated
+!
+
+!
+username cisco password 0 cisco
+!
+redundancy
+!
+!
+interface Loopback0
+ ip vrf forwarding ISP1
+ ip address 8.8.8.8 255.255.255.255
+!
+interface Loopback1
+ ip vrf forwarding ISP2
+ ip address 77.88.8.8 255.255.255.255
+!
+interface Loopback2
+ ip address 11.11.11.11 255.255.255.255
+!
+interface Loopback3
+ ip address 22.22.22.22 255.255.255.255
+!
+interface Tunnel1
+ bandwidth 10000000
+ ip vrf forwarding ISP1
+ ip address 100.22.5.1 255.255.255.252
+ no ip redirects
+ ip mtu 9000
+ tunnel source Loopback2
+ tunnel destination 22.22.22.22
+!
+interface Tunnel2
+ bandwidth 10000000
+ ip vrf forwarding ISP2
+ ip address 100.22.5.2 255.255.255.252
+ no ip redirects
+ ip mtu 9000
+ tunnel source Loopback3
+ tunnel destination 11.11.11.11
+!
+interface Multilink1
+ no sh
+ ip vrf forwarding ISP1
+ ip address 100.45.5.1 255.255.255.252
+ peer default ip address pool PPP
+ ppp multilink
+ ppp multilink group 1
+!
+interface Gi 0/0
+ no sh
+ description to FW1 E0 from ISP1
+ ip vrf forwarding ISP1
+ ip address 100.45.10.1 255.255.255.252
+!
+interface Gi 0/1
+ no sh
+ no ip address
+!
+interface Gi 0/1.901
+ description to FW1 E1 from ISP2
+ encapsulation dot1Q 901
+ ip vrf forwarding ISP2
+ ip address 22.84.4.5 255.255.255.252
+!
+interface Serial 0/1/0
+ no sh
+ description to BR1 from ISP1
+ no ip address
+ encapsulation ppp
+ ppp multilink
+ ppp multilink group 1
+ serial restart-delay 0
+ clock rate 64000
+!
+interface Serial 0/1/1
+ no sh
+ description to BR1 from ISP1
+ no ip address
+ encapsulation ppp
+ ppp multilink
+ ppp multilink group 1
+ serial restart-delay 0
+ clock rate 64000
+!
+interface Serial 0/2/0
+ no sh
+ enc hdlc
+ description to BR1 from ISP2
+ ip vrf forwarding ISP2
+ encapsulation hdlc
+ ip address 22.84.4.1 255.255.255.252
+ serial restart-delay 0
+ clock rate 64000
+!
+!
+router bgp 65001
+ bgp router-id 8.8.8.8
+ bgp log-neighbor-changes
+ neighbor 100.22.5.1 remote-as 65001
+ !
+ address-family ipv4
+  no neighbor 100.22.5.1 activate
+ exit-address-family
+ !
+ address-family ipv4 vrf ISP1
+  bgp router-id 8.8.8.8
+  network 8.8.8.8 mask 255.255.255.255
+  network 100.22.5.0 mask 255.255.255.252
+  network 100.45.5.0 mask 255.255.255.252
+  network 100.45.10.0 mask 255.255.255.252
+  redistribute static
+  neighbor 100.22.5.2 remote-as 65001
+  neighbor 100.22.5.2 activate
+  neighbor 100.45.5.2 remote-as 65010
+  neighbor 100.45.5.2 activate
+  neighbor 100.45.5.2 default-originate
+  neighbor 100.45.5.2 weight 65010
+  neighbor 100.45.10.2 remote-as 65000
+  neighbor 100.45.10.2 activate
+  neighbor 100.45.10.2 default-originate
+  neighbor 100.45.10.2 weight 65000
+ exit-address-family
+ !
+ address-family ipv4 vrf ISP2
+  bgp router-id 77.88.8.8
+  network 22.84.4.0 mask 255.255.255.252
+  network 22.84.4.4 mask 255.255.255.252
+  network 77.88.8.8 mask 255.255.255.255
+  network 100.22.5.0 mask 255.255.255.252
+  redistribute static
+  neighbor 22.84.4.2 remote-as 65010
+  neighbor 22.84.4.2 local-as 65002 no-prepend replace-as
+  neighbor 22.84.4.2 activate
+  neighbor 22.84.4.2 default-originate
+  neighbor 22.84.4.2 weight 64000
+  neighbor 22.84.4.6 remote-as 65000
+  neighbor 22.84.4.6 local-as 65002 no-prepend replace-as
+  neighbor 22.84.4.6 activate
+  neighbor 22.84.4.6 default-originate
+  neighbor 22.84.4.6 weight 64000
+  neighbor 100.22.5.1 remote-as 65001
+  neighbor 100.22.5.1 activate
+ exit-address-family
+!
+!
+!
+no ip http server
+no ip http secure-server
+ip route vrf ISP1 0.0.0.0 0.0.0.0 Null0
+ip route vrf ISP2 0.0.0.0 0.0.0.0 Null0
+!
+control-plane
+!
+!
+line con 0
+ logging synchronous
+line aux 0
+line vty 0 15
+ transport input none
+!
+!
+end

@@ -1,0 +1,137 @@
+!
+no ip domain-lookup
+hostname HQ1
+ip domain-name worldskills.ru
+username wsruser privilege 15 secret network
+enable secret wsr
+service password-encryption
+!
+crypto key generate rsa modulus 1024
+ip ssh version 2
+!
+aaa new-model
+radius server KS54
+address ipv4 172.16.20.20 auth-port 1812 acct-port 1813
+key cisco
+aaa authentication login method_man group radius local
+aaa authentication login default local
+aaa authorization console
+aaa authorization exec method_man group radius local
+aaa authorization exec default local
+!
+ipv6 unicast-routing
+!
+int Gi 0/1
+no sh
+no ip add
+interface Gi 0/1.100
+encapsulation dot1Q 100
+ip address 10.100.100.1 255.255.255.0
+no shutdown
+interface gi 0/1.200
+encapsulation dot1Q 200
+ip address 172.16.20.1 255.255.255.0
+no shutdown
+interface gi 0/1.300
+ipv6 enable
+encapsulation dot1Q 300
+ip address 30.78.21.1 255.255.255.0
+ipv6 address 2001:A:B:DEAD::1/64
+no shutdown
+interface loopback 0
+ip address 1.1.1.1 255.255.255.255
+no shutdown
+ipv6 add 2001:A:B:1::1/64
+!
+line vty 0 15
+login authentication method_man
+authorization exec method_man
+transport input ssh
+line console 0
+login authentication default
+authorization exec default
+!
+int gi 0/0
+no sh
+no ip add
+interface gi 0/0.20
+encapsulation dot1Q 20
+ip address 30.78.87.1 255.255.255.248
+ipv6 enable
+ipv6 address 2001:3::1/64
+interface gi 0/0.10
+ipv6 enable
+encapsulation dot1Q 10
+ip address 172.16.3.1 255.255.255.0
+ipv6 add 2001:4::1/64
+no shutdown
+exit
+!
+router ospf 1
+network 172.16.3.0 0.0.0.255 area 0
+network 10.100.100.0 0.0.0.255 area 51
+network 172.16.20.0 0.0.0.255 area 51
+network 172.16.1.0 0.0.0.255 area 0
+passive-interface default
+no passive-interface gi 0/0.10
+router bgp 65000
+network 1.1.1.1 mask 255.255.255.255
+network 30.78.87.0 mask 255.255.255.248
+network 30.78.21.0 mask 255.255.255.0
+neighbor 30.78.87.2 remote-as 65000
+neighbor 30.78.87.2 activate
+!
+ipv6 router eigrp 6000
+eigrp router-id 1.1.1.1
+no shutdown
+!
+interface gi 0/0.10
+ipv6 eigrp 6000
+interface gi 0/0.20
+ipv6 eigrp 6000
+exit
+!
+ntp server 172.16.20.20
+clock timezone MSK 3
+ip dhcp pool PC1
+host 30.78.21.10
+client-identifier 0050.0000.0900.00
+default-router 30.78.21.1
+option 150 ip 172.16.20.20
+end
+!
+conf t
+----------------------------------------------------------------------
+logging 172.16.20.20
+logging trap informational
+snmp-server location MSK, Russia
+snmp-server contact admin@wsr.ru
+snmp-server group WSR v3 priv
+snmp-server community RO ro
+snmp-server user snmpuser WSR v3 auth sha snmppass  priv aes 128 snmppass
+archive
+path tftp://172.16.20.20/$H-$t.cfg
+write-memory
+!
+interface tunnel 1
+no shutdown
+ip address 172.16.1.1 255.255.255.0
+tunnel source 3.3.3.3
+!
+tunnel destination 1.1.1.1
+!
+crypto isakmp policy 10
+hash sha
+encryption des
+authentication pre-share
+group 2
+crypto isakmp key cisco address 1.1.1.1
+crypto ipsec transform-set tunnel esp-des esp-sha-hmac
+mode tunnel
+crypto ipsec profile tunnelprofile
+ set transform-set tunnel
+int tun 1
+tunnel protection ipsec profile tunnelprofile
+!
+router ospf 1
+no passive-interface tunnel 1
